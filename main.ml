@@ -5,11 +5,19 @@ let bind port =
   Unix.bind server_socket (ADDR_INET (address, port));
   server_socket
 
+let read_tcp tcp =
+  let buffer = Bytes.create (1024 * 10) in
+  let len = Unix.read tcp buffer 0 1024 in
+  Printf.printf "read %d bytes\n %s" len (Bytes.to_string buffer)
+
 (**
 1. 发送消息
 2. 关闭读和写 
 *)
+
 let handle_tcp (client_tcp, _) =
+  let thread = Thread.create read_tcp client_tcp in
+  Thread.join thread;
   let s = "hello world" in
   let len = String.length s in
   let x = Unix.send client_tcp (Bytes.of_string s) 0 len [] in
