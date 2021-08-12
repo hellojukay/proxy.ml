@@ -5,19 +5,24 @@ let bind port =
   Unix.bind server_socket (ADDR_INET (address, port));
   server_socket
 
-let handle_tcp tcp =
+(**
+1. 发送消息
+2. 关闭读和写 
+*)
+let handle_tcp (client_tcp, _) =
   let s = "hello world" in
   let len = String.length s in
-  let x = Unix.send tcp (Bytes.of_string s) 0 len [] in
-  Printf.printf "send %d bytes" x;
-  flush stdout
+  let x = Unix.send client_tcp (Bytes.of_string s) 0 len [] in
+  Printf.printf "send %d bytes\n" x;
+  flush stdout;
+  Unix.shutdown client_tcp Unix.SHUTDOWN_ALL
 
 let () =
   let port = 1080 in
   let address = bind port in
   Unix.listen address 10;
   while true do
-    let client_sock, _ = Unix.accept address in
-    let thread = Thread.create handle_tcp client_sock in
+    let client_sock, client_addr = Unix.accept address in
+    let thread = Thread.create handle_tcp (client_sock, client_addr) in
     Thread.join thread
   done
