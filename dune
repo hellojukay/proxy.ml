@@ -1,3 +1,3 @@
 (executable
  (name main)
- (libraries threads.posix unix))
+ (libraries core threads.posix unix  re2))
