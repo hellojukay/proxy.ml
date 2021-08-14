@@ -9,7 +9,7 @@ type host = Error of string | Host of (string * int)
 
 let parse_host line =
   ignore line;
-  Host ("www.baidu.com", 80)
+  Host ("www.517huwai.com", 80)
 
 let parse_head head_string =
   let lines = String.split_on_char '\r' head_string in
@@ -21,11 +21,13 @@ let copy (input, output) =
   try
     while true do
       let len = Unix.read input buffer 0 102400 in
-      Log.info
-        (Printf.sprintf "write %d bytes to socket"
-           (Unix.write output buffer 0 len))
+      Unix.write output buffer 0 len |> Printf.printf "write %d \n";
+      Log.info (Bytes.to_string buffer);
+      Unix.fsync output
     done
-  with End_of_file -> Unix.shutdown input Unix.SHUTDOWN_ALL
+  with e ->
+    Printexc.to_string e |> Printf.printf "with exception %s";
+    Unix.shutdown input Unix.SHUTDOWN_ALL
 
 let proxy tcp host port =
   let client_sock = Unix.socket PF_INET SOCK_STREAM 0 in
@@ -37,9 +39,9 @@ let proxy tcp host port =
   Thread.join t2
 
 let read_tcp tcp =
-  let buffer = Bytes.create (1024 * 10) in
-  ignore (Unix.read tcp buffer 0 10240);
-  let host = parse_host (Bytes.to_string buffer) in
+  (* let buffer = Bytes.create (1024 * 10) in
+     ignore (Unix.read tcp buffer 0 10240); *)
+  let host = Host ("www.baidu.com", 80) in
   match host with
   | Error str -> Printf.printf "%s" str
   | Host (hostname, port) ->
@@ -58,7 +60,8 @@ let handle_tcp (client_tcp, _) =
   let len = String.length s in
   let x = Unix.send client_tcp (Bytes.of_string s) 0 len [] in
   Printf.printf "send %d bytes\n" x;
-  flush stdout
+  flush stdout;
+  Unix.fsync client_tcp
 (* Unix.shutdown client_tcp Unix.SHUTDOWN_ALL *)
 
 let () =
