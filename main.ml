@@ -1,7 +1,7 @@
 let bind port =
   let server_socket = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
   Unix.setsockopt server_socket Unix.SO_REUSEADDR true;
-  let address = Unix.inet_addr_of_string "127.0.0.1" in
+  let address = Unix.inet_addr_of_string "0.0.0.0" in
   Unix.bind server_socket (ADDR_INET (address, port));
   server_socket
 
@@ -15,8 +15,7 @@ let copy (input, output) =
   try
     while true do
       let len = Unix.read input buffer 0 102400 in
-      if len > 0 then
-        Unix.write output buffer 0 len |> ignore
+      if len > 0 then Unix.write output buffer 0 len |> ignore
     done
   with e ->
     Printexc.to_string e |> Printf.printf "with exception %s";
