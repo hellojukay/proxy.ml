@@ -16,7 +16,7 @@ let copy (input, output) =
     while true do
       let len = Unix.read input buffer 0 102400 in
       if len > 0 then
-        Unix.write output buffer 0 len |> Printf.printf "write %d \n"
+        Unix.write output buffer 0 len |> ignore
     done
   with e ->
     Printexc.to_string e |> Printf.printf "with exception %s";
