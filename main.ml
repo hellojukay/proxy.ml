@@ -15,9 +15,8 @@ let copy (input, output) =
   try
     while true do
       let len = Unix.read input buffer 0 102400 in
-      if len > 0 then (
-        Unix.write output buffer 0 len |> Printf.printf "write %d \n";
-        Log.info (Bytes.to_string buffer))
+      if len > 0 then
+        Unix.write output buffer 0 len |> Printf.printf "write %d \n"
     done
   with e ->
     Printexc.to_string e |> Printf.printf "with exception %s";
@@ -51,9 +50,16 @@ let parse_first_line str =
     else Host (List.nth list 0, "80")
 
 let () =
-  let port = 8080 in
-  let address = bind port in
+  let usage_msg = "A http(s) proxy server"
+  and port = ref 1080
+  and anon_fun _ = () in
+  let speclist =
+    [ ("-p", Arg.Set_int port, "Server listen port (default: 8080)") ]
+  in
+  Arg.parse speclist anon_fun usage_msg;
+  let address = bind !port in
   Unix.listen address 1000;
+  Log.info (Printf.sprintf "server runing on :%d" !port);
   while true do
     let client, _ = Unix.accept address in
     let buffer_size = 1024 in
@@ -62,18 +68,18 @@ let () =
     let host = parse_first_line (Bytes.to_string buffer) in
     match host with
     | TUNNEL (host, port) ->
-        Log.info (Printf.sprintf "%s:%s" host port);
         let s = connect_remote host port in
         let res =
           "HTTP/1.1 200 Connection Established\r\nProxy-agent: golang\r\n\r\n"
         in
         let buf = Bytes.of_string res in
-        ignore (Unix.write s buf 0 (String.length res));
-        Thread.create copy (client, s) |> Thread.join
+        ignore (Unix.write client buf 0 (String.length res));
+        Thread.create copy (client, s) |> ignore;
+        Thread.create copy (s, client) |> ignore
     | Host (host, port) ->
-        Log.info (Printf.sprintf "%s:%s" host port);
         let s = connect_remote host port in
         ignore (Unix.write s buffer 0 n);
-        Thread.create copy (s, client) |> Thread.join
+        Thread.create copy (s, client) |> ignore;
+        Thread.create copy (client, s) |> ignore
     | Error s -> Printf.printf "%s" s
   done
