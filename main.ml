@@ -7,8 +7,8 @@ let bind port =
 
 type host =
   | Error of string
-  | Host of (string * string)
-  | TUNNEL of (string * string)
+  | GET of (string * string)
+  | CONNECT of (string * string)
 
 let copy (input, output) =
   let buffer = Bytes.create 1024 in
@@ -20,12 +20,12 @@ let copy (input, output) =
     done
   with
   | End_of_file as e ->
-      Printexc.to_string e |> Printf.printf "with exception %s";
+      e |> Printexc.to_string |> Printf.printf "with exception %s";
       flush stdout;
       Unix.shutdown input Unix.SHUTDOWN_RECEIVE;
       Thread.exit ()
   | e ->
-      Printexc.to_string e |> Log.info;
+      e |> Printexc.to_string |> Log.info;
       flush stdout;
       Thread.exit ()
 
@@ -37,7 +37,7 @@ let connect_remote host port =
       (Unix.ADDR_INET (hentry.h_addr_list.(0), int_of_string port));
     Some client_sock
   with e ->
-    Printexc.to_string e |> Log.info;
+    e |> Printexc.to_string |> Log.info;
     flush stdout;
     None
 
@@ -45,20 +45,20 @@ let connect_remote host port =
 (* GET http://www.baidu.com *)
 let parse_first_line str =
   let first_line = List.nth (Str.split (Str.regexp "\r\n") str) 0 in
-  Log.info first_line;
+  first_line |> Log.info;
   let tmp =
     first_line |> Str.split (Str.regexp " ") |> fun list -> List.nth list 1
   in
   let r = Str.regexp "^CONNECT" in
   if Str.string_match r first_line 0 then
     let l = Str.split (Str.regexp ":") tmp in
-    TUNNEL (List.nth l 0, List.nth l 1)
+    CONNECT (List.nth l 0, List.nth l 1)
   else
     let r = Str.regexp "/+" in
     let tmp = Str.split r first_line |> fun list -> List.nth list 1 in
     tmp |> Str.split (Str.regexp ":") |> fun list ->
-    if List.length list == 0 then Host (List.nth list 0, List.nth list 1)
-    else Host (List.nth list 0, "80")
+    if List.length list == 0 then GET (List.nth list 0, List.nth list 1)
+    else GET (List.nth list 0, "80")
 
 let handle_socket client =
   try
@@ -67,7 +67,7 @@ let handle_socket client =
     let n = Unix.read client buffer 0 buffer_size in
     let host = parse_first_line (Bytes.to_string buffer) in
     match host with
-    | TUNNEL (host, port) -> (
+    | CONNECT (host, port) -> (
         let s = connect_remote host port in
         match s with
         | Some s ->
@@ -81,7 +81,7 @@ let handle_socket client =
             Thread.create copy (client, s) |> ignore;
             Thread.create copy (s, client) |> ignore
         | None -> Thread.exit ())
-    | Host (host, port) -> (
+    | GET (host, port) -> (
         let s = connect_remote host port in
         match s with
         | Some s ->
@@ -91,7 +91,7 @@ let handle_socket client =
         | None -> Thread.exit ())
     | Error str -> Log.info str
   with e ->
-    Printexc.to_string e |> Log.info;
+    e |> Printexc.to_string |> Log.info;
     flush stdout;
     Thread.exit ()
 
