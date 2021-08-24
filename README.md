@@ -4,7 +4,7 @@
 
 ![demo](demo.gif)
 
-# 编译运行
+## 编译运行
 ```shell
 dune install
 dune build
