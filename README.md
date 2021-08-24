@@ -1,6 +1,10 @@
 # proxy.ml
-一个用 OCaml 实现的 http(s) 代理服务器,暂不支持 Windows.
+一个用 OCaml 实现的 http(s) 代理服务器, 极低的资源占用，只支持 Linux 和 Max OSX 在内的 Unix.
 
+
+![demo](demo.gif)
+
+# 编译运行
 ```shell
 dune install
 dune build
