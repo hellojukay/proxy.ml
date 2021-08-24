@@ -1,6 +1,6 @@
 let format (tm : Unix.tm) =
-  Printf.sprintf "%d-%d-%d %d:%d:%d" tm.tm_year tm.tm_mon tm.tm_mday tm.tm_hour
-    tm.tm_min tm.tm_sec
+  Printf.sprintf "%d-%d-%d %d:%d:%d" (1900 + tm.tm_year) tm.tm_mon tm.tm_mday
+    tm.tm_hour tm.tm_min tm.tm_sec
 
 let info str =
   let tm = Unix.time () |> Unix.localtime in
