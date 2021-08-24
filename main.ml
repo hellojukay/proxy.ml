@@ -11,23 +11,35 @@ type host =
   | TUNNEL of (string * string)
 
 let copy (input, output) =
-  let buffer = Bytes.create 102400 in
+  let buffer = Bytes.create 1024 in
   try
     while true do
-      let len = Unix.read input buffer 0 102400 in
+      let len = Unix.read input buffer 0 1024 in
       if len > 0 then Unix.write output buffer 0 len |> ignore
+      else Unix.sleepf 0.1
     done
-  with e ->
-    Printexc.to_string e |> Printf.printf "with exception %s";
-    Unix.shutdown input Unix.SHUTDOWN_ALL;
-    Unix.shutdown output Unix.SHUTDOWN_ALL
+  with
+  | End_of_file as e ->
+      Printexc.to_string e |> Printf.printf "with exception %s";
+      flush stdout;
+      Unix.shutdown input Unix.SHUTDOWN_RECEIVE;
+      Thread.exit ()
+  | e ->
+      Printexc.to_string e |> Log.info;
+      flush stdout;
+      Thread.exit ()
 
 let connect_remote host port =
-  let client_sock = Unix.socket PF_INET SOCK_STREAM 0 in
-  let hentry = Unix.gethostbyname host in
-  Unix.connect client_sock
-    (Unix.ADDR_INET (hentry.h_addr_list.(0), int_of_string port));
-  client_sock
+  try
+    let client_sock = Unix.socket PF_INET SOCK_STREAM 0 in
+    let hentry = Unix.gethostbyname host in
+    Unix.connect client_sock
+      (Unix.ADDR_INET (hentry.h_addr_list.(0), int_of_string port));
+    Some client_sock
+  with e ->
+    Printexc.to_string e |> Log.info;
+    flush stdout;
+    None
 
 (* CONNECT wwww.badiu.com:443 http/1.1\r\n *)
 (* GET http://www.baidu.com *)
@@ -48,7 +60,43 @@ let parse_first_line str =
     if List.length list == 0 then Host (List.nth list 0, List.nth list 1)
     else Host (List.nth list 0, "80")
 
+let handle_socket client =
+  try
+    let buffer_size = 1024 in
+    let buffer = Bytes.create buffer_size in
+    let n = Unix.read client buffer 0 buffer_size in
+    let host = parse_first_line (Bytes.to_string buffer) in
+    match host with
+    | TUNNEL (host, port) -> (
+        let s = connect_remote host port in
+        match s with
+        | Some s ->
+            let res =
+              "HTTP/1.1 200 Connection Established\r\n\
+               Proxy-agent: golang\r\n\
+               \r\n"
+            in
+            let buf = Bytes.of_string res in
+            ignore (Unix.write client buf 0 (String.length res));
+            Thread.create copy (client, s) |> ignore;
+            Thread.create copy (s, client) |> ignore
+        | None -> Thread.exit ())
+    | Host (host, port) -> (
+        let s = connect_remote host port in
+        match s with
+        | Some s ->
+            ignore (Unix.write s buffer 0 n);
+            Thread.create copy (s, client) |> ignore;
+            Thread.create copy (client, s) |> ignore
+        | None -> Thread.exit ())
+    | Error str -> Log.info str
+  with e ->
+    Printexc.to_string e |> Log.info;
+    flush stdout;
+    Thread.exit ()
+
 let () =
+  Sys.signal Sys.sigpipe Sys.Signal_ignore |> ignore;
   let usage_msg = "A http(s) proxy server"
   and port = ref 1080
   and anon_fun _ = () in
@@ -58,27 +106,8 @@ let () =
   Arg.parse speclist anon_fun usage_msg;
   let address = bind !port in
   Unix.listen address 1000;
-  Log.info (Printf.sprintf "server runing on :%d" !port);
+  Printf.sprintf "server runing on :%d" !port |> Log.info;
   while true do
     let client, _ = Unix.accept address in
-    let buffer_size = 1024 in
-    let buffer = Bytes.create buffer_size in
-    let n = Unix.read client buffer 0 buffer_size in
-    let host = parse_first_line (Bytes.to_string buffer) in
-    match host with
-    | TUNNEL (host, port) ->
-        let s = connect_remote host port in
-        let res =
-          "HTTP/1.1 200 Connection Established\r\nProxy-agent: golang\r\n\r\n"
-        in
-        let buf = Bytes.of_string res in
-        ignore (Unix.write client buf 0 (String.length res));
-        Thread.create copy (client, s) |> ignore;
-        Thread.create copy (s, client) |> ignore
-    | Host (host, port) ->
-        let s = connect_remote host port in
-        ignore (Unix.write s buffer 0 n);
-        Thread.create copy (s, client) |> ignore;
-        Thread.create copy (client, s) |> ignore
-    | Error s -> Printf.printf "%s" s
+    Thread.create handle_socket client |> ignore
   done
