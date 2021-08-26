@@ -23,6 +23,7 @@ let copy (input, output) =
       e |> Printexc.to_string |> Printf.printf "with exception %s";
       flush stdout;
       Unix.shutdown input Unix.SHUTDOWN_RECEIVE;
+      Unix.shutdown output Unix.SHUTDOWN_SEND;
       Thread.exit ()
   | e ->
       e |> Printexc.to_string |> Log.info;
