@@ -20,13 +20,13 @@ let copy (input, output) =
     done
   with
   | End_of_file as e ->
-      e |> Printexc.to_string |> Printf.printf "with exception %s";
+      e |> Printexc.to_string |> Log.error;
       flush stdout;
       Unix.shutdown input Unix.SHUTDOWN_RECEIVE;
       Unix.shutdown output Unix.SHUTDOWN_SEND;
       Thread.exit ()
   | e ->
-      e |> Printexc.to_string |> Log.info;
+      e |> Printexc.to_string |> Log.error;
       flush stdout;
       Thread.exit ()
 
@@ -38,7 +38,7 @@ let connect_remote host port =
       (Unix.ADDR_INET (hentry.h_addr_list.(0), int_of_string port));
     Some client_sock
   with e ->
-    e |> Printexc.to_string |> Log.info;
+    e |> Printexc.to_string |> Log.error;
     flush stdout;
     None
 
@@ -90,9 +90,9 @@ let handle_socket client =
             Thread.create copy (s, client) |> ignore;
             Thread.create copy (client, s) |> ignore
         | None -> Thread.exit ())
-    | Error str -> Log.info str
+    | Error str -> str |> Log.error
   with e ->
-    e |> Printexc.to_string |> Log.info;
+    e |> Printexc.to_string |> Log.error;
     flush stdout;
     Thread.exit ()
 
@@ -107,7 +107,8 @@ let () =
   Arg.parse speclist anon_fun usage_msg;
   let address = bind !port in
   Unix.listen address 1000;
-  Printf.sprintf "server runing on :%d" !port |> Log.info;
+  let logger = new Log.logger in
+  Printf.sprintf "server runing on :%d" !port |> logger#info;
   while true do
     let client, _ = Unix.accept address in
     Thread.create handle_socket client |> ignore
