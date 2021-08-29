@@ -108,7 +108,7 @@ let () =
   let address = bind !port in
   Unix.listen address 1000;
   let logger = new Log.logger in
-  Printf.sprintf "server runing on :%d" !port |> logger#info;
+  Printf.sprintf "Server  is runing on :%d" !port |> logger#info;
   while true do
     let client, _ = Unix.accept address in
     Thread.create handle_socket client |> ignore
