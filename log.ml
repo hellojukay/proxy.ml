@@ -7,15 +7,34 @@ let level_tostring l =
   | ERROR -> "ERROR"
   | WARN -> "WARN"
 
+let color_str ~level msg =
+  let red = "\027[0;31;1m" in
+  let yellow = "\027[0;33m" in
+  let green = "\027[0;32m" in
+  let cyan = "\027[0;36m" in
+  let color_end = "\027[0m" in
+  match level with
+  | DEBUG -> cyan ^ msg ^ color_end
+  | INFO -> green ^ msg ^ color_end
+  | ERROR -> red ^ msg ^ color_end
+  | WARN -> yellow ^ msg ^ color_end
+
 class logger =
   object (self)
     val mutable lvl : level = WARN
+
+    val mutable color : bool = true
 
     val mutable output : Stdlib.out_channel = stdout
 
     val mutable prefix = ""
 
     val lk = Mutex.create ()
+
+    method with_color b =
+      Mutex.lock lk;
+      color <- b;
+      Mutex.unlock lk
 
     method set_output out =
       Mutex.lock lk;
@@ -42,8 +61,12 @@ class logger =
         local.tm_mon local.tm_mday local.tm_hour local.tm_min local.tm_sec
 
     method with_prefix_and_time l str =
-      Printf.sprintf "%s %s %s %s\n" (self#now ()) (level_tostring l) prefix str
-      |> self#write
+      let msg =
+        Printf.sprintf "%s %s %s %s" (self#now ()) (level_tostring l) prefix str
+      in
+      if color then
+        msg |> color_str ~level:l |> Printf.sprintf "%s\n" |> self#write
+      else msg |> Printf.sprintf "%s\n" |> self#write
 
     method set_level (l : level) =
       Mutex.lock lk;

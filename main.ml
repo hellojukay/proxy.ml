@@ -69,7 +69,7 @@ let handle_socket client =
         | Some s ->
             let res =
               "HTTP/1.1 200 Connection Established\r\n\
-               Proxy-agent: golang\r\n\
+               Proxy-agent: proxy.ml\r\n\
                \r\n"
             in
             let buf = Bytes.of_string res in
@@ -103,6 +103,7 @@ let () =
   let address = bind !port in
   Unix.listen address 1000;
   let logger = new Log.logger in
+  logger#with_color true;
   Printf.sprintf "Server  is runing on :%d" !port |> logger#info;
   while true do
     let client, _ = Unix.accept address in
