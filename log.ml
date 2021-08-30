@@ -41,9 +41,8 @@ class logger =
       Printf.sprintf "%d-%02d-%02d %02d:%02d:%02d" (local.tm_year + 1900)
         local.tm_mon local.tm_mday local.tm_hour local.tm_min local.tm_sec
 
-    method with_prefix_and_time lvl str =
-      Printf.sprintf "%s %s %s %s\n" (self#now ()) (level_tostring lvl) prefix
-        str
+    method with_prefix_and_time l str =
+      Printf.sprintf "%s %s %s %s\n" (self#now ()) (level_tostring l) prefix str
       |> self#write
 
     method set_level (l : level) =
@@ -53,13 +52,15 @@ class logger =
 
     method debug msg =
       match lvl with
-      | DEBUG | WARN -> self#with_prefix_and_time DEBUG msg
+      | INFO | DEBUG -> self#with_prefix_and_time DEBUG msg
       | _ -> ()
 
     method error msg = self#with_prefix_and_time ERROR msg
 
     method info msg =
-      match lvl with ERROR -> () | _ -> self#with_prefix_and_time INFO msg
+      match lvl with
+      | DEBUG | INFO | WARN -> self#with_prefix_and_time INFO msg
+      | _ -> ()
 
     method warn msg =
       match lvl with WARN -> self#with_prefix_and_time WARN msg | _ -> ()
@@ -73,4 +74,4 @@ let debug = log#debug
 
 let warn = log#warn
 
-let error = log#warn
+let error = log#error

@@ -19,15 +19,10 @@ let copy (input, output) =
       else Unix.sleepf 0.1
     done
   with
-  | End_of_file as e ->
-      e |> Printexc.to_string |> Log.error;
-      flush stdout;
-      Unix.shutdown input Unix.SHUTDOWN_RECEIVE;
-      Unix.shutdown output Unix.SHUTDOWN_SEND;
-      Thread.exit ()
-  | e ->
-      e |> Printexc.to_string |> Log.error;
-      flush stdout;
+  | Unix.Unix_error (_, _, _) -> Thread.exit ()
+  | End_of_file ->
+      Unix.shutdown output Unix.SHUTDOWN_ALL;
+      Unix.shutdown input Unix.SHUTDOWN_ALL;
       Thread.exit ()
 
 let connect_remote host port =
